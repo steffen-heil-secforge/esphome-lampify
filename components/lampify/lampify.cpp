@@ -180,14 +180,12 @@ void Lampify::send_packet(uint8_t *packet) {
     return;
   }
 
-  ESP_LOGD(TAG, "Sending packet for device 0x%04X", device_id_);
-
-  // Log packet in debug mode
-  char hex_str[97];
+  // Log packet at INFO level for debugging
+  char hex_str[65];
   for (int i = 0; i < 32; i++) {
-    sprintf(hex_str + i * 3, "%02X ", packet[i]);
+    sprintf(hex_str + i * 2, "%02X", packet[i]);
   }
-  ESP_LOGV(TAG, "Packet: %s", hex_str);
+  ESP_LOGI(TAG, "Sending packet: %s", hex_str);
 
   // Configure advertising parameters
   esp_ble_adv_params_t adv_params = {
