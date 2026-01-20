@@ -4,7 +4,6 @@ from esphome.components import button
 from esphome.const import (
     CONF_ID,
     ENTITY_CATEGORY_CONFIG,
-    ICON_BLUETOOTH,
 )
 from . import lampify_ns, Lampify
 
@@ -15,7 +14,7 @@ LampifyPairButton = lampify_ns.class_("LampifyPairButton", button.Button, cg.Com
 CONFIG_SCHEMA = (
     button.button_schema(
         LampifyPairButton,
-        icon=ICON_BLUETOOTH,
+        icon="mdi:bluetooth",
         entity_category=ENTITY_CATEGORY_CONFIG,
     )
     .extend(

@@ -3,9 +3,7 @@ import esphome.config_validation as cv
 from esphome.components import number
 from esphome.const import (
     CONF_ID,
-    CONF_MODE,
     ENTITY_CATEGORY_CONFIG,
-    ICON_RADIO_TOWER,
 )
 from . import lampify_ns, Lampify
 
@@ -18,7 +16,7 @@ LampifyDeviceIdNumber = lampify_ns.class_(
 CONFIG_SCHEMA = (
     number.number_schema(
         LampifyDeviceIdNumber,
-        icon=ICON_RADIO_TOWER,
+        icon="mdi:radio-tower",
         entity_category=ENTITY_CATEGORY_CONFIG,
     )
     .extend(
