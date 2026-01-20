@@ -1,0 +1,68 @@
+esphome:
+  name: lampify-controller
+  friendly_name: Lampify Controller
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+logger:
+
+api:
+  encryption:
+    key: !secret api_key
+
+ota:
+  platform: esphome
+  password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+# Required for BLE
+esp32_ble:
+
+# External component
+external_components:
+  - source: github://yourusername/esphome-lampify
+    components: [lampify]
+
+# Option 1: As a light entity (recommended)
+light:
+  - platform: lampify
+    name: "Desk Lamp"
+    device_id: 0x1234
+
+# Option 2: Manual control with actions
+# lampify:
+#   id: my_lamp
+#   device_id: 0x1234
+#
+# button:
+#   - platform: template
+#     name: "Lamp On"
+#     on_press:
+#       - lampify.turn_on:
+#           id: my_lamp
+#
+#   - platform: template
+#     name: "Lamp Off"
+#     on_press:
+#       - lampify.turn_off:
+#           id: my_lamp
+#
+#   - platform: template
+#     name: "Set 50%"
+#     on_press:
+#       - lampify.set_level:
+#           id: my_lamp
+#           cold: 128
+#           warm: 128
+#
+#   - platform: template
+#     name: "Pair"
+#     on_press:
+#       - lampify.pair:
+#           id: my_lamp
