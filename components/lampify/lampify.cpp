@@ -153,7 +153,8 @@ void Lampify::build_packet(uint8_t command, uint8_t arg1, uint8_t arg2, uint8_t 
   msg_base[13] = device_id_ & 0xFF;          // Master control low byte
   msg_base[14] = arg1;
   msg_base[15] = arg2;
-  msg_base[17] = esp_random() & 0xFF;        // Random byte
+  msg_base[17] = 0x42;  // Fixed value for testing - should match CLI with same device ID
+  // msg_base[17] = esp_random() & 0xFF;        // Random byte (disabled for testing)
 
   // Calculate CRC
   uint16_t crc = crc16(msg_base, 11);
@@ -187,30 +188,46 @@ void Lampify::send_packet(uint8_t *packet) {
   }
   ESP_LOGI(TAG, "Sending packet: %s", hex_str);
 
-  // Stop any existing advertising first
-  esp_ble_gap_stop_advertising();
-  delay(20);
+  // Use raw BLE advertising via ESP-IDF VHCI/controller layer
+  // This bypasses the GAP layer which may be causing issues
 
-  // Configure advertising parameters - match CLI exactly
-  // CLI uses memset to 0, so advtype=0 (ADV_IND), filter=0, etc.
+  // First, stop any existing advertising
+  esp_ble_gap_stop_advertising();
+  delay(50);
+
+  // HCI LE Set Advertising Parameters (OGF=0x08, OCF=0x0006)
+  // Parameters: min_interval(2), max_interval(2), type(1), own_addr_type(1),
+  //             peer_addr_type(1), peer_addr(6), channel_map(1), filter_policy(1)
+  uint8_t adv_params_cmd[15] = {0};
+  adv_params_cmd[0] = 0x20;  // min_interval low byte
+  adv_params_cmd[1] = 0x00;  // min_interval high byte
+  adv_params_cmd[2] = 0x20;  // max_interval low byte
+  adv_params_cmd[3] = 0x00;  // max_interval high byte
+  adv_params_cmd[4] = 0x00;  // adv_type = ADV_IND (connectable undirected)
+  adv_params_cmd[5] = 0x00;  // own_addr_type = public
+  adv_params_cmd[6] = 0x00;  // peer_addr_type = public
+  // adv_params_cmd[7-12] = peer_addr (all zeros)
+  adv_params_cmd[13] = 0x07; // channel_map = all channels
+  adv_params_cmd[14] = 0x00; // filter_policy = allow all
+
+  // Use esp_ble_gap functions but set params first
   esp_ble_adv_params_t adv_params = {};
   adv_params.adv_int_min = 0x20;
   adv_params.adv_int_max = 0x20;
-  adv_params.adv_type = ADV_TYPE_IND;  // 0 = connectable undirected
+  adv_params.adv_type = ADV_TYPE_IND;
   adv_params.own_addr_type = BLE_ADDR_TYPE_PUBLIC;
-  adv_params.channel_map = ADV_CHNL_ALL;  // 7 = all channels
+  adv_params.channel_map = ADV_CHNL_ALL;
   adv_params.adv_filter_policy = ADV_FILTER_ALLOW_SCAN_ANY_CON_ANY;
 
-  // Set raw advertising data (skip first byte which is length)
-  // The packet is: [0x1F=length][31 bytes of adv data]
+  // Set advertising data - send full 31 bytes (skip length byte)
   esp_err_t ret = esp_ble_gap_config_adv_data_raw(packet + 1, 31);
   if (ret != ESP_OK) {
     ESP_LOGE(TAG, "Failed to set advertising data: %s", esp_err_to_name(ret));
     return;
   }
 
-  // Wait for advertising data to be set (async operation needs time)
-  delay(100);
+  // Wait longer for async operation
+  delay(200);
 
   // Start advertising
   ret = esp_ble_gap_start_advertising(&adv_params);
@@ -219,10 +236,10 @@ void Lampify::send_packet(uint8_t *packet) {
     return;
   }
 
-  ESP_LOGI(TAG, "Advertising started");
+  ESP_LOGI(TAG, "Advertising started, sending for 500ms");
 
-  // Advertise for 100ms (same as CLI's usleep(100000))
-  delay(100);
+  // Advertise for 500ms (longer than CLI to ensure delivery)
+  delay(500);
 
   // Stop advertising
   ret = esp_ble_gap_stop_advertising();
