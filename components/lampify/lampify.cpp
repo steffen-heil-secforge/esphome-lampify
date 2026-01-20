@@ -188,10 +188,11 @@ void Lampify::send_packet(uint8_t *packet) {
   ESP_LOGI(TAG, "Sending packet: %s", hex_str);
 
   // Configure advertising parameters
+  // Use ADV_TYPE_IND (connectable) to match CLI behavior - lamp may filter on adv type
   esp_ble_adv_params_t adv_params = {
     .adv_int_min = 0x20,
     .adv_int_max = 0x20,
-    .adv_type = ADV_TYPE_NONCONN_IND,
+    .adv_type = ADV_TYPE_IND,
     .own_addr_type = BLE_ADDR_TYPE_PUBLIC,
     .peer_addr = {0},
     .peer_addr_type = BLE_ADDR_TYPE_PUBLIC,
@@ -205,6 +206,9 @@ void Lampify::send_packet(uint8_t *packet) {
     ESP_LOGE(TAG, "Failed to set advertising data: %s", esp_err_to_name(ret));
     return;
   }
+
+  // Wait for advertising data to be set (async operation)
+  delay(50);
 
   // Start advertising
   ret = esp_ble_gap_start_advertising(&adv_params);
