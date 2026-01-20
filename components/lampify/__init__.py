@@ -51,21 +51,21 @@ LAMPIFY_SET_LEVEL_SCHEMA = cv.Schema(
 )
 
 
-@cg.action_registry.register("lampify.turn_on", LAMPIFY_ACTION_SCHEMA)
+@automation.register_action("lampify.turn_on", TurnOnAction, LAMPIFY_ACTION_SCHEMA)
 async def turn_on_action_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg)
     await cg.register_parented(var, config[CONF_ID])
     return var
 
 
-@cg.action_registry.register("lampify.turn_off", LAMPIFY_ACTION_SCHEMA)
+@automation.register_action("lampify.turn_off", TurnOffAction, LAMPIFY_ACTION_SCHEMA)
 async def turn_off_action_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg)
     await cg.register_parented(var, config[CONF_ID])
     return var
 
 
-@cg.action_registry.register("lampify.set_level", LAMPIFY_SET_LEVEL_SCHEMA)
+@automation.register_action("lampify.set_level", SetLevelAction, LAMPIFY_SET_LEVEL_SCHEMA)
 async def set_level_action_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg)
     await cg.register_parented(var, config[CONF_ID])
@@ -76,7 +76,7 @@ async def set_level_action_to_code(config, action_id, template_arg, args):
     return var
 
 
-@cg.action_registry.register("lampify.pair", LAMPIFY_ACTION_SCHEMA)
+@automation.register_action("lampify.pair", PairAction, LAMPIFY_ACTION_SCHEMA)
 async def pair_action_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg)
     await cg.register_parented(var, config[CONF_ID])
