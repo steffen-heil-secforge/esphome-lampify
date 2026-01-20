@@ -20,7 +20,7 @@ class LampifyDeviceIdNumber : public number::Number, public Component {
   }
 
   void dump_config() override {
-    LOG_NUMBER("", "Lampify Device ID", this);
+    ESP_LOGCONFIG("lampify.number", "Lampify Device ID Number");
   }
 
  protected:

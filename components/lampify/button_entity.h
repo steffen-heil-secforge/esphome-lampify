@@ -11,7 +11,7 @@ class LampifyPairButton : public button::Button, public Component {
   void set_parent(Lampify *parent) { this->parent_ = parent; }
 
   void dump_config() override {
-    LOG_BUTTON("", "Lampify Pair Button", this);
+    ESP_LOGCONFIG("lampify.button", "Lampify Pair Button");
   }
 
  protected:
