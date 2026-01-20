@@ -187,28 +187,30 @@ void Lampify::send_packet(uint8_t *packet) {
   }
   ESP_LOGI(TAG, "Sending packet: %s", hex_str);
 
-  // Configure advertising parameters
-  // Use ADV_TYPE_IND (connectable) to match CLI behavior - lamp may filter on adv type
-  esp_ble_adv_params_t adv_params = {
-    .adv_int_min = 0x20,
-    .adv_int_max = 0x20,
-    .adv_type = ADV_TYPE_IND,
-    .own_addr_type = BLE_ADDR_TYPE_PUBLIC,
-    .peer_addr = {0},
-    .peer_addr_type = BLE_ADDR_TYPE_PUBLIC,
-    .channel_map = ADV_CHNL_ALL,
-    .adv_filter_policy = ADV_FILTER_ALLOW_SCAN_ANY_CON_ANY,
-  };
+  // Stop any existing advertising first
+  esp_ble_gap_stop_advertising();
+  delay(20);
+
+  // Configure advertising parameters - match CLI exactly
+  // CLI uses memset to 0, so advtype=0 (ADV_IND), filter=0, etc.
+  esp_ble_adv_params_t adv_params = {};
+  adv_params.adv_int_min = 0x20;
+  adv_params.adv_int_max = 0x20;
+  adv_params.adv_type = ADV_TYPE_IND;  // 0 = connectable undirected
+  adv_params.own_addr_type = BLE_ADDR_TYPE_PUBLIC;
+  adv_params.channel_map = ADV_CHNL_ALL;  // 7 = all channels
+  adv_params.adv_filter_policy = ADV_FILTER_ALLOW_SCAN_ANY_CON_ANY;
 
   // Set raw advertising data (skip first byte which is length)
+  // The packet is: [0x1F=length][31 bytes of adv data]
   esp_err_t ret = esp_ble_gap_config_adv_data_raw(packet + 1, 31);
   if (ret != ESP_OK) {
     ESP_LOGE(TAG, "Failed to set advertising data: %s", esp_err_to_name(ret));
     return;
   }
 
-  // Wait for advertising data to be set (async operation)
-  delay(50);
+  // Wait for advertising data to be set (async operation needs time)
+  delay(100);
 
   // Start advertising
   ret = esp_ble_gap_start_advertising(&adv_params);
@@ -217,13 +219,18 @@ void Lampify::send_packet(uint8_t *packet) {
     return;
   }
 
-  // Advertise for 100ms
+  ESP_LOGI(TAG, "Advertising started");
+
+  // Advertise for 100ms (same as CLI's usleep(100000))
   delay(100);
 
   // Stop advertising
-  esp_ble_gap_stop_advertising();
+  ret = esp_ble_gap_stop_advertising();
+  if (ret != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to stop advertising: %s", esp_err_to_name(ret));
+  }
 
-  ESP_LOGD(TAG, "Packet sent successfully");
+  ESP_LOGI(TAG, "Packet sent successfully");
 }
 
 void Lampify::turn_on() {
