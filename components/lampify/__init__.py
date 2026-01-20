@@ -2,6 +2,7 @@ import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.const import CONF_ID
 from esphome.components import esp32_ble
+from esphome import automation
 
 DEPENDENCIES = ["esp32_ble"]
 CODEOWNERS = ["@steffen-heil-secforge"]
@@ -13,10 +14,10 @@ lampify_ns = cg.esphome_ns.namespace("lampify")
 Lampify = lampify_ns.class_("Lampify", cg.Component)
 
 # Actions
-TurnOnAction = lampify_ns.class_("TurnOnAction", cg.Action)
-TurnOffAction = lampify_ns.class_("TurnOffAction", cg.Action)
-SetLevelAction = lampify_ns.class_("SetLevelAction", cg.Action)
-PairAction = lampify_ns.class_("PairAction", cg.Action)
+TurnOnAction = lampify_ns.class_("TurnOnAction", automation.Action)
+TurnOffAction = lampify_ns.class_("TurnOffAction", automation.Action)
+SetLevelAction = lampify_ns.class_("SetLevelAction", automation.Action)
+PairAction = lampify_ns.class_("PairAction", automation.Action)
 
 CONFIG_SCHEMA = cv.Schema(
     {
