@@ -1,6 +1,7 @@
 #include "lampify.h"
 #include "esphome/core/log.h"
 #include <cstring>
+#include <esp_random.h>
 
 namespace esphome {
 namespace lampify {
