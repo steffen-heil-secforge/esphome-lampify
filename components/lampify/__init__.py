@@ -4,7 +4,7 @@ from esphome.const import CONF_ID
 from esphome.components import esp32_ble
 
 DEPENDENCIES = ["esp32_ble"]
-CODEOWNERS = ["@your-github-username"]
+CODEOWNERS = ["@steffen-heil-secforge"]
 
 CONF_DEVICE_ID = "device_id"
 

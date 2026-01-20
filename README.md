@@ -8,7 +8,7 @@ Add this to your ESPHome YAML:
 
 ```yaml
 external_components:
-  - source: github://yourusername/esphome-lampify
+  - source: github://steffen-heil-secforge/esphome-lampify
     components: [lampify]
 ```
 

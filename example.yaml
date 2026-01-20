@@ -26,7 +26,7 @@ esp32_ble:
 
 # External component
 external_components:
-  - source: github://yourusername/esphome-lampify
+  - source: github://steffen-heil-secforge/esphome-lampify
     components: [lampify]
 
 # Option 1: As a light entity (recommended)
