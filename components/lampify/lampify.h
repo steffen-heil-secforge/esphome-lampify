@@ -2,6 +2,7 @@
 
 #include "esphome/core/component.h"
 #include "esphome/core/automation.h"
+#include "esphome/core/preferences.h"
 #include "esphome/core/log.h"
 #include "esphome/components/esp32_ble/ble.h"
 #include <esp_bt.h>
@@ -12,7 +13,8 @@ namespace lampify {
 
 class Lampify : public Component {
  public:
-  void set_device_id(uint16_t device_id) { device_id_ = device_id; }
+  void set_device_id(uint16_t device_id);
+  uint16_t get_device_id() const { return device_id_; }
 
   void setup() override;
   void dump_config() override;
@@ -23,8 +25,14 @@ class Lampify : public Component {
   void set_level(uint8_t cold, uint8_t warm);
   void pair();
 
+  void add_on_device_id_change_callback(std::function<void()> callback) {
+    this->device_id_change_callbacks_.add(std::move(callback));
+  }
+
  protected:
   uint16_t device_id_{0};
+  ESPPreferenceObject pref_;
+  CallbackManager<void()> device_id_change_callbacks_;
 
   static const uint8_t MIN_LEVEL = 3;
   static const uint8_t MAX_LEVEL = 255;
@@ -40,6 +48,9 @@ class Lampify : public Component {
   void build_packet(uint8_t command, uint8_t arg1, uint8_t arg2, uint8_t *packet);
   void send_packet(uint8_t *packet);
 };
+
+// Global instance for services
+extern Lampify *global_lampify;
 
 template<typename... Ts> class TurnOnAction : public Action<Ts...>, public Parented<Lampify> {
  public:

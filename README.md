@@ -14,79 +14,95 @@ external_components:
 
 ## Usage
 
-### As a Light Entity (Recommended)
+### Minimal Setup (Configure from Home Assistant)
 
 ```yaml
 esp32_ble:
 
+lampify:
+
+number:
+  - platform: lampify
+    name: "Lamp Device ID"
+
+button:
+  - platform: lampify
+    name: "Pair Lamp"
+
 light:
   - platform: lampify
     name: "Desk Lamp"
-    device_id: 0x1234
 ```
 
-This creates a light with brightness and color temperature control in Home Assistant.
+This creates:
+- A **number entity** to set the device ID from Home Assistant (persisted to flash)
+- A **pair button** to pair with lamps
+- A **light entity** with brightness and color temperature control
 
-### With Manual Actions
+### With Preset Device ID
+
+If you know your device ID, you can set it in YAML:
+
+```yaml
+esp32_ble:
+
+lampify:
+  device_id: 0x1234  # Optional: preset device ID
+
+number:
+  - platform: lampify
+    name: "Lamp Device ID"
+
+button:
+  - platform: lampify
+    name: "Pair Lamp"
+
+light:
+  - platform: lampify
+    name: "Desk Lamp"
+```
+
+### With Manual Actions (for automations)
 
 ```yaml
 esp32_ble:
 
 lampify:
   id: my_lamp
-  device_id: 0x1234
 
+# Automation example
 button:
   - platform: template
-    name: "Lamp On"
-    on_press:
-      - lampify.turn_on:
-          id: my_lamp
-
-  - platform: template
-    name: "Lamp Off"
-    on_press:
-      - lampify.turn_off:
-          id: my_lamp
-
-  - platform: template
-    name: "Lamp Bright"
+    name: "Bright Mode"
     on_press:
       - lampify.set_level:
           id: my_lamp
           cold: 255
           warm: 255
-
-  - platform: template
-    name: "Pair Lamp"
-    on_press:
-      - lampify.pair:
-          id: my_lamp
 ```
 
-## Pairing
+## Pairing a New Lamp
 
-To pair with a new lamp:
+1. Set the device ID (any value 0x0001-0xFFFF) via the number entity in Home Assistant
+2. Power on the lamp
+3. Within 5 seconds, press the "Pair Lamp" button in Home Assistant
+4. The lamp will store the device ID and respond to future commands
 
-1. Power on the lamp (within 5 seconds of power-on)
-2. Trigger the `lampify.pair` action
+## Entities
 
-The lamp will store the device ID and only respond to commands with matching IDs.
+| Entity Type | Name | Description |
+|-------------|------|-------------|
+| `number` | Device ID | 0-65535, stored in flash |
+| `button` | Pair | Sends pair command to lamp |
+| `light` | Lamp | Brightness + color temperature control |
 
-## Configuration
-
-| Option | Type | Required | Description |
-|--------|------|----------|-------------|
-| `device_id` | hex | Yes | 16-bit hex ID (0x0000-0xFFFF) |
-| `name` | string | Yes (light) | Entity name in Home Assistant |
-
-## Actions
+## Actions (for automations)
 
 | Action | Parameters | Description |
 |--------|------------|-------------|
 | `lampify.turn_on` | none | Turn lamp on |
 | `lampify.turn_off` | none | Turn lamp off |
-| `lampify.set_level` | `cold`, `warm` (3-255) | Set brightness levels |
+| `lampify.set_level` | `cold`, `warm` (3-255) | Set brightness levels directly |
 | `lampify.pair` | none | Pair with lamp |
 
 ## Hardware

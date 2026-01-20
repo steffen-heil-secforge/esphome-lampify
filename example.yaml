@@ -29,40 +29,21 @@ external_components:
   - source: github://steffen-heil-secforge/esphome-lampify
     components: [lampify]
 
-# Option 1: As a light entity (recommended)
+# Core lampify component (device_id is optional, can be set from HA)
+lampify:
+  # device_id: 0x1234  # Uncomment to preset device ID
+
+# Number entity to set device ID from Home Assistant
+number:
+  - platform: lampify
+    name: "Lamp Device ID"
+
+# Button to pair with lamp
+button:
+  - platform: lampify
+    name: "Pair Lamp"
+
+# Light entity with brightness and color temperature
 light:
   - platform: lampify
     name: "Desk Lamp"
-    device_id: 0x1234
-
-# Option 2: Manual control with actions
-# lampify:
-#   id: my_lamp
-#   device_id: 0x1234
-#
-# button:
-#   - platform: template
-#     name: "Lamp On"
-#     on_press:
-#       - lampify.turn_on:
-#           id: my_lamp
-#
-#   - platform: template
-#     name: "Lamp Off"
-#     on_press:
-#       - lampify.turn_off:
-#           id: my_lamp
-#
-#   - platform: template
-#     name: "Set 50%"
-#     on_press:
-#       - lampify.set_level:
-#           id: my_lamp
-#           cold: 128
-#           warm: 128
-#
-#   - platform: template
-#     name: "Pair"
-#     on_press:
-#       - lampify.pair:
-#           id: my_lamp

@@ -5,6 +5,7 @@ from esphome.components import esp32_ble
 
 DEPENDENCIES = ["esp32_ble"]
 CODEOWNERS = ["@steffen-heil-secforge"]
+AUTO_LOAD = ["number", "button"]
 
 CONF_DEVICE_ID = "device_id"
 
@@ -20,7 +21,7 @@ PairAction = lampify_ns.class_("PairAction", cg.Action)
 CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(): cv.declare_id(Lampify),
-        cv.Required(CONF_DEVICE_ID): cv.hex_uint16_t,
+        cv.Optional(CONF_DEVICE_ID): cv.hex_uint16_t,
     }
 ).extend(cv.COMPONENT_SCHEMA)
 
@@ -28,7 +29,9 @@ CONFIG_SCHEMA = cv.Schema(
 async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
-    cg.add(var.set_device_id(config[CONF_DEVICE_ID]))
+
+    if CONF_DEVICE_ID in config:
+        cg.add(var.set_device_id(config[CONF_DEVICE_ID]))
 
 
 # Action schemas

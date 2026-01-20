@@ -8,7 +8,7 @@ namespace lampify {
 
 class LampifyLight : public light::LightOutput, public Component {
  public:
-  void set_device_id(uint16_t device_id) { device_id_ = device_id; }
+  void set_parent(Lampify *parent) { this->parent_ = parent; }
 
   void setup() override;
   void dump_config() override;
@@ -18,8 +18,7 @@ class LampifyLight : public light::LightOutput, public Component {
   void write_state(light::LightState *state) override;
 
  protected:
-  uint16_t device_id_{0};
-  Lampify controller_;
+  Lampify *parent_{nullptr};
   bool last_state_{false};
   uint8_t last_cold_{0};
   uint8_t last_warm_{0};

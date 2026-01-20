@@ -7,6 +7,8 @@ namespace lampify {
 
 static const char *const TAG = "lampify";
 
+Lampify *global_lampify = nullptr;  // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
+
 const uint8_t Lampify::PACKET_BASE[32] = {
     0x1F, 0x02, 0x01, 0x01, 0x1B, 0x03, 0x71, 0x0F,
     0x55, 0xAA, 0x98, 0x43, 0xAF, 0x0B, 0x46, 0x46,
@@ -50,12 +52,31 @@ const uint16_t Lampify::CRC_TABLE[256] = {
 };
 
 void Lampify::setup() {
-  ESP_LOGCONFIG(TAG, "Setting up Lampify with device ID: 0x%04X", device_id_);
+  global_lampify = this;
+
+  // Load device_id from preferences
+  this->pref_ = global_preferences->make_preference<uint16_t>(fnv1_hash("lampify_device_id"));
+  uint16_t stored_id;
+  if (this->pref_.load(&stored_id)) {
+    this->device_id_ = stored_id;
+    ESP_LOGCONFIG(TAG, "Loaded device ID from flash: 0x%04X", device_id_);
+  } else {
+    ESP_LOGCONFIG(TAG, "No stored device ID, using: 0x%04X", device_id_);
+  }
 }
 
 void Lampify::dump_config() {
   ESP_LOGCONFIG(TAG, "Lampify:");
   ESP_LOGCONFIG(TAG, "  Device ID: 0x%04X", device_id_);
+}
+
+void Lampify::set_device_id(uint16_t device_id) {
+  if (this->device_id_ != device_id) {
+    this->device_id_ = device_id;
+    this->pref_.save(&device_id);
+    ESP_LOGI(TAG, "Device ID set to 0x%04X", device_id_);
+    this->device_id_change_callbacks_.call();
+  }
 }
 
 uint8_t Lampify::clamp_level(uint8_t val) {
@@ -153,6 +174,11 @@ void Lampify::build_packet(uint8_t command, uint8_t arg1, uint8_t arg2, uint8_t 
 }
 
 void Lampify::send_packet(uint8_t *packet) {
+  if (device_id_ == 0) {
+    ESP_LOGW(TAG, "Device ID not set, cannot send packet");
+    return;
+  }
+
   ESP_LOGD(TAG, "Sending packet for device 0x%04X", device_id_);
 
   // Log packet in debug mode

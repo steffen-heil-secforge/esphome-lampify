@@ -7,14 +7,12 @@ namespace lampify {
 static const char *const TAG = "lampify.light";
 
 void LampifyLight::setup() {
-  controller_.set_device_id(device_id_);
-  controller_.setup();
-  ESP_LOGCONFIG(TAG, "Setting up Lampify Light with device ID: 0x%04X", device_id_);
+  ESP_LOGCONFIG(TAG, "Setting up Lampify Light");
 }
 
 void LampifyLight::dump_config() {
   ESP_LOGCONFIG(TAG, "Lampify Light:");
-  ESP_LOGCONFIG(TAG, "  Device ID: 0x%04X", device_id_);
+  ESP_LOGCONFIG(TAG, "  Using parent Lampify component");
 }
 
 light::LightTraits LampifyLight::get_traits() {
@@ -52,7 +50,7 @@ void LampifyLight::write_state(light::LightState *state) {
 
     // Only send if changed
     if (!last_state_ || cold != last_cold_ || warm != last_warm_) {
-      controller_.set_level(cold, warm);
+      this->parent_->set_level(cold, warm);
       last_cold_ = cold;
       last_warm_ = warm;
     }
@@ -62,7 +60,7 @@ void LampifyLight::write_state(light::LightState *state) {
     }
   } else {
     if (last_state_) {
-      controller_.turn_off();
+      this->parent_->turn_off();
       last_state_ = false;
     }
   }
