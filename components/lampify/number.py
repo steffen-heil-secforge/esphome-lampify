@@ -3,6 +3,7 @@ import esphome.config_validation as cv
 from esphome.components import number
 from esphome.const import (
     CONF_ID,
+    CONF_MODE,
     ENTITY_CATEGORY_CONFIG,
 )
 from . import lampify_ns, Lampify, CONF_LAMP_INDEX
@@ -37,6 +38,7 @@ async def to_code(config):
         step=1,
     )
     await cg.register_component(var, config)
+    cg.add(var.traits.set_mode(number.NumberMode.NUMBER_MODE_BOX))
 
     parent = await cg.get_variable(config["lampify_id"])
     cg.add(var.set_parent(parent))
