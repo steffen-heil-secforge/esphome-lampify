@@ -8,7 +8,7 @@ DEPENDENCIES = ["lampify"]
 
 LampifyLight = lampify_ns.class_("LampifyLight", light.LightOutput, cg.Component)
 
-CONFIG_SCHEMA = light.RGB_LIGHT_SCHEMA.extend(
+CONFIG_SCHEMA = light.LIGHT_SCHEMA.extend(
     {
         cv.GenerateID(CONF_OUTPUT_ID): cv.declare_id(LampifyLight),
         cv.GenerateID("lampify_id"): cv.use_id(Lampify),

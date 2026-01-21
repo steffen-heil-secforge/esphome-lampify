@@ -153,8 +153,7 @@ void Lampify::build_packet(uint8_t command, uint8_t arg1, uint8_t arg2, uint8_t 
   msg_base[13] = device_id_ & 0xFF;          // Master control low byte
   msg_base[14] = arg1;
   msg_base[15] = arg2;
-  msg_base[17] = 0x42;  // Fixed value for testing - should match CLI with same device ID
-  // msg_base[17] = esp_random() & 0xFF;        // Random byte (disabled for testing)
+  msg_base[17] = esp_random() & 0xFF;  // Random byte for each packet
 
   // Calculate CRC
   uint16_t crc = crc16(msg_base, 11);
@@ -181,73 +180,59 @@ void Lampify::send_packet(uint8_t *packet) {
     return;
   }
 
-  // Log packet at INFO level for debugging and store for diagnostic sensor
+  // Store packet for diagnostic sensor
   for (int i = 0; i < 32; i++) {
     sprintf(last_packet_hex_ + i * 2, "%02X", packet[i]);
   }
   last_packet_hex_[64] = '\0';
   ESP_LOGI(TAG, "Sending packet: %s", last_packet_hex_);
 
-  // Use raw BLE advertising via ESP-IDF VHCI/controller layer
-  // This bypasses the GAP layer which may be causing issues
+  // Set TX power to maximum (+9 dBm)
+  esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_ADV, ESP_PWR_LVL_P9);
 
-  // First, stop any existing advertising
+  // CRITICAL: Stop BLE scanning aggressively - call multiple times
+  // The ESPHome BLE tracker can interfere with advertising
+  esp_ble_gap_stop_scanning();
   esp_ble_gap_stop_advertising();
-  delay(50);
+  delay(100);
+  esp_ble_gap_stop_scanning();  // Call again to be sure
+  delay(100);
 
-  // HCI LE Set Advertising Parameters (OGF=0x08, OCF=0x0006)
-  // Parameters: min_interval(2), max_interval(2), type(1), own_addr_type(1),
-  //             peer_addr_type(1), peer_addr(6), channel_map(1), filter_policy(1)
-  uint8_t adv_params_cmd[15] = {0};
-  adv_params_cmd[0] = 0x20;  // min_interval low byte
-  adv_params_cmd[1] = 0x00;  // min_interval high byte
-  adv_params_cmd[2] = 0x20;  // max_interval low byte
-  adv_params_cmd[3] = 0x00;  // max_interval high byte
-  adv_params_cmd[4] = 0x00;  // adv_type = ADV_IND (connectable undirected)
-  adv_params_cmd[5] = 0x00;  // own_addr_type = public
-  adv_params_cmd[6] = 0x00;  // peer_addr_type = public
-  // adv_params_cmd[7-12] = peer_addr (all zeros)
-  adv_params_cmd[13] = 0x07; // channel_map = all channels
-  adv_params_cmd[14] = 0x00; // filter_policy = allow all
-
-  // Use esp_ble_gap functions but set params first
+  // Configure advertising parameters to match CLI exactly
   esp_ble_adv_params_t adv_params = {};
-  adv_params.adv_int_min = 0x20;
-  adv_params.adv_int_max = 0x20;
-  adv_params.adv_type = ADV_TYPE_IND;
+  adv_params.adv_int_min = 0x20;        // 32 * 0.625ms = 20ms
+  adv_params.adv_int_max = 0x20;        // Same as min
+  adv_params.adv_type = ADV_TYPE_IND;   // Connectable undirected (matches CLI)
   adv_params.own_addr_type = BLE_ADDR_TYPE_PUBLIC;
   adv_params.channel_map = ADV_CHNL_ALL;
   adv_params.adv_filter_policy = ADV_FILTER_ALLOW_SCAN_ANY_CON_ANY;
 
-  // Set advertising data - send full 31 bytes (skip length byte)
-  esp_err_t ret = esp_ble_gap_config_adv_data_raw(packet + 1, 31);
-  if (ret != ESP_OK) {
-    ESP_LOGE(TAG, "Failed to set advertising data: %s", esp_err_to_name(ret));
-    return;
+  // Send multiple bursts for reliability
+  for (int burst = 0; burst < 3; burst++) {
+    // Set advertising data
+    esp_err_t ret = esp_ble_gap_config_adv_data_raw(packet + 1, 31);
+    if (ret != ESP_OK) {
+      ESP_LOGE(TAG, "Failed to set advertising data: %s", esp_err_to_name(ret));
+      continue;
+    }
+    delay(50);
+
+    // Start advertising
+    ret = esp_ble_gap_start_advertising(&adv_params);
+    if (ret != ESP_OK) {
+      ESP_LOGE(TAG, "Failed to start advertising: %s", esp_err_to_name(ret));
+      continue;
+    }
+
+    // Advertise for 150ms per burst
+    delay(150);
+
+    // Stop advertising
+    esp_ble_gap_stop_advertising();
+    delay(30);
   }
 
-  // Wait longer for async operation
-  delay(200);
-
-  // Start advertising
-  ret = esp_ble_gap_start_advertising(&adv_params);
-  if (ret != ESP_OK) {
-    ESP_LOGE(TAG, "Failed to start advertising: %s", esp_err_to_name(ret));
-    return;
-  }
-
-  ESP_LOGI(TAG, "Advertising started, sending for 500ms");
-
-  // Advertise for 500ms (longer than CLI to ensure delivery)
-  delay(500);
-
-  // Stop advertising
-  ret = esp_ble_gap_stop_advertising();
-  if (ret != ESP_OK) {
-    ESP_LOGE(TAG, "Failed to stop advertising: %s", esp_err_to_name(ret));
-  }
-
-  ESP_LOGI(TAG, "Packet sent successfully");
+  ESP_LOGI(TAG, "Packet sent (3 bursts)");
 }
 
 void Lampify::turn_on() {

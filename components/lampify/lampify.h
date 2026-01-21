@@ -7,6 +7,7 @@
 #include "esphome/components/esp32_ble/ble.h"
 #include <esp_bt.h>
 #include <esp_gap_ble_api.h>
+#include <esp_bt_main.h>
 
 namespace esphome {
 namespace lampify {

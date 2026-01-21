@@ -6,9 +6,10 @@ from esphome import automation
 
 DEPENDENCIES = ["esp32_ble"]
 CODEOWNERS = ["@steffen-heil-secforge"]
-AUTO_LOAD = ["number", "button"]
+AUTO_LOAD = ["number", "button", "text_sensor"]
 
 CONF_DEVICE_ID = "device_id"
+CONF_LAMPIFY_ID = "lampify_id"
 
 lampify_ns = cg.esphome_ns.namespace("lampify")
 Lampify = lampify_ns.class_("Lampify", cg.Component)
