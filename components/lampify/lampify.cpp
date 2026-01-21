@@ -181,12 +181,12 @@ void Lampify::send_packet(uint8_t *packet) {
     return;
   }
 
-  // Log packet at INFO level for debugging
-  char hex_str[65];
+  // Log packet at INFO level for debugging and store for diagnostic sensor
   for (int i = 0; i < 32; i++) {
-    sprintf(hex_str + i * 2, "%02X", packet[i]);
+    sprintf(last_packet_hex_ + i * 2, "%02X", packet[i]);
   }
-  ESP_LOGI(TAG, "Sending packet: %s", hex_str);
+  last_packet_hex_[64] = '\0';
+  ESP_LOGI(TAG, "Sending packet: %s", last_packet_hex_);
 
   // Use raw BLE advertising via ESP-IDF VHCI/controller layer
   // This bypasses the GAP layer which may be causing issues

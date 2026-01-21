@@ -15,6 +15,7 @@ class Lampify : public Component {
  public:
   void set_device_id(uint16_t device_id);
   uint16_t get_device_id() const { return device_id_; }
+  const char* get_last_packet() const { return last_packet_hex_; }
 
   void setup() override;
   void dump_config() override;
@@ -30,6 +31,7 @@ class Lampify : public Component {
   }
 
  protected:
+  char last_packet_hex_[65] = {0};  // Store last sent packet as hex string
   uint16_t device_id_{0};
   ESPPreferenceObject pref_;
   CallbackManager<void()> device_id_change_callbacks_;
