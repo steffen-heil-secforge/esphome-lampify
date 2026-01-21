@@ -55,28 +55,58 @@ const uint16_t Lampify::CRC_TABLE[256] = {
 void Lampify::setup() {
   global_lampify = this;
 
-  // Load device_id from preferences
-  this->pref_ = global_preferences->make_preference<uint16_t>(fnv1_hash("lampify_device_id"));
-  uint16_t stored_id;
-  if (this->pref_.load(&stored_id)) {
-    this->device_id_ = stored_id;
-    ESP_LOGCONFIG(TAG, "Loaded device ID from flash: 0x%04X", device_id_);
-  } else {
-    ESP_LOGCONFIG(TAG, "No stored device ID, using: 0x%04X", device_id_);
+  // Load device IDs for all lamp slots from flash
+  for (uint8_t i = 0; i < num_lamps_ && i < MAX_LAMPS; i++) {
+    char pref_key[32];
+    snprintf(pref_key, sizeof(pref_key), "lampify_id_%d", i);
+    prefs_[i] = global_preferences->make_preference<uint16_t>(fnv1_hash(pref_key));
+
+    uint16_t stored_id = 0;
+    if (prefs_[i].load(&stored_id)) {
+      device_ids_[i] = stored_id;
+      if (stored_id > 0) {
+        ESP_LOGCONFIG(TAG, "Lamp %d: loaded device ID 0x%04X from flash", i + 1, stored_id);
+      }
+    }
   }
 }
 
 void Lampify::dump_config() {
   ESP_LOGCONFIG(TAG, "Lampify:");
-  ESP_LOGCONFIG(TAG, "  Device ID: 0x%04X", device_id_);
+  ESP_LOGCONFIG(TAG, "  Number of lamp slots: %d", num_lamps_);
+  for (uint8_t i = 0; i < num_lamps_ && i < MAX_LAMPS; i++) {
+    if (device_ids_[i] > 0) {
+      ESP_LOGCONFIG(TAG, "  Lamp %d: Device ID 0x%04X (%d)", i + 1, device_ids_[i], device_ids_[i]);
+    } else {
+      ESP_LOGCONFIG(TAG, "  Lamp %d: Not configured", i + 1);
+    }
+  }
 }
 
-void Lampify::set_device_id(uint16_t device_id) {
-  if (this->device_id_ != device_id) {
-    this->device_id_ = device_id;
-    this->pref_.save(&device_id);
-    ESP_LOGI(TAG, "Device ID set to 0x%04X", device_id_);
-    this->device_id_change_callbacks_.call();
+void Lampify::set_device_id(uint8_t lamp_index, uint16_t device_id) {
+  if (lamp_index >= MAX_LAMPS) {
+    ESP_LOGW(TAG, "Lamp index %d out of range", lamp_index);
+    return;
+  }
+
+  if (device_ids_[lamp_index] != device_id) {
+    device_ids_[lamp_index] = device_id;
+    prefs_[lamp_index].save(&device_id);
+    ESP_LOGI(TAG, "Lamp %d: Device ID set to 0x%04X (%d)", lamp_index + 1, device_id, device_id);
+    device_id_change_callbacks_[lamp_index].call();
+  }
+}
+
+uint16_t Lampify::get_device_id(uint8_t lamp_index) const {
+  if (lamp_index >= MAX_LAMPS) {
+    return 0;
+  }
+  return device_ids_[lamp_index];
+}
+
+void Lampify::add_on_device_id_change_callback(uint8_t lamp_index, std::function<void()> callback) {
+  if (lamp_index < MAX_LAMPS) {
+    device_id_change_callbacks_[lamp_index].add(std::move(callback));
   }
 }
 
@@ -137,7 +167,7 @@ void Lampify::ble_whitening_for_packet(uint8_t *input, uint8_t *output) {
   }
 }
 
-void Lampify::build_packet(uint8_t command, uint8_t arg1, uint8_t arg2, uint8_t *packet) {
+void Lampify::build_packet(uint16_t device_id, uint8_t command, uint8_t arg1, uint8_t arg2, uint8_t *packet) {
   uint8_t msg_base[25];
   uint8_t msg_rev[25];
   uint8_t msg_wht[25];
@@ -149,8 +179,8 @@ void Lampify::build_packet(uint8_t command, uint8_t arg1, uint8_t arg2, uint8_t 
 
   // Set command and arguments
   msg_base[11] = command;
-  msg_base[12] = (device_id_ >> 8) & 0xFF;  // Master control high byte
-  msg_base[13] = device_id_ & 0xFF;          // Master control low byte
+  msg_base[12] = (device_id >> 8) & 0xFF;  // Master control high byte
+  msg_base[13] = device_id & 0xFF;          // Master control low byte
   msg_base[14] = arg1;
   msg_base[15] = arg2;
   msg_base[17] = esp_random() & 0xFF;  // Random byte for each packet
@@ -175,11 +205,6 @@ void Lampify::build_packet(uint8_t command, uint8_t arg1, uint8_t arg2, uint8_t 
 }
 
 void Lampify::send_packet(uint8_t *packet) {
-  if (device_id_ == 0) {
-    ESP_LOGW(TAG, "Device ID not set, cannot send packet");
-    return;
-  }
-
   // Store packet for diagnostic sensor
   for (int i = 0; i < 32; i++) {
     sprintf(last_packet_hex_ + i * 2, "%02X", packet[i]);
@@ -190,26 +215,24 @@ void Lampify::send_packet(uint8_t *packet) {
   // Set TX power to maximum (+9 dBm)
   esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_ADV, ESP_PWR_LVL_P9);
 
-  // CRITICAL: Stop BLE scanning aggressively - call multiple times
-  // The ESPHome BLE tracker can interfere with advertising
+  // CRITICAL: Stop BLE scanning aggressively
   esp_ble_gap_stop_scanning();
   esp_ble_gap_stop_advertising();
   delay(100);
-  esp_ble_gap_stop_scanning();  // Call again to be sure
+  esp_ble_gap_stop_scanning();
   delay(100);
 
-  // Configure advertising parameters to match CLI exactly
+  // Configure advertising parameters
   esp_ble_adv_params_t adv_params = {};
-  adv_params.adv_int_min = 0x20;        // 32 * 0.625ms = 20ms
-  adv_params.adv_int_max = 0x20;        // Same as min
-  adv_params.adv_type = ADV_TYPE_IND;   // Connectable undirected (matches CLI)
+  adv_params.adv_int_min = 0x20;
+  adv_params.adv_int_max = 0x20;
+  adv_params.adv_type = ADV_TYPE_IND;
   adv_params.own_addr_type = BLE_ADDR_TYPE_PUBLIC;
   adv_params.channel_map = ADV_CHNL_ALL;
   adv_params.adv_filter_policy = ADV_FILTER_ALLOW_SCAN_ANY_CON_ANY;
 
   // Send multiple bursts for reliability
   for (int burst = 0; burst < 3; burst++) {
-    // Set advertising data
     esp_err_t ret = esp_ble_gap_config_adv_data_raw(packet + 1, 31);
     if (ret != ESP_OK) {
       ESP_LOGE(TAG, "Failed to set advertising data: %s", esp_err_to_name(ret));
@@ -217,17 +240,13 @@ void Lampify::send_packet(uint8_t *packet) {
     }
     delay(50);
 
-    // Start advertising
     ret = esp_ble_gap_start_advertising(&adv_params);
     if (ret != ESP_OK) {
       ESP_LOGE(TAG, "Failed to start advertising: %s", esp_err_to_name(ret));
       continue;
     }
 
-    // Advertise for 150ms per burst
     delay(150);
-
-    // Stop advertising
     esp_ble_gap_stop_advertising();
     delay(30);
   }
@@ -235,35 +254,55 @@ void Lampify::send_packet(uint8_t *packet) {
   ESP_LOGI(TAG, "Packet sent (3 bursts)");
 }
 
-void Lampify::turn_on() {
-  ESP_LOGI(TAG, "Turning on lamp 0x%04X", device_id_);
+void Lampify::turn_on(uint8_t lamp_index) {
+  uint16_t device_id = get_device_id(lamp_index);
+  if (device_id == 0) {
+    ESP_LOGW(TAG, "Lamp %d: Device ID not set, cannot turn on", lamp_index + 1);
+    return;
+  }
+  ESP_LOGI(TAG, "Lamp %d: Turning on (ID 0x%04X)", lamp_index + 1, device_id);
   uint8_t packet[32];
-  build_packet(0x10, 0x00, 0x00, packet);
+  build_packet(device_id, 0x10, 0x00, 0x00, packet);
   send_packet(packet);
 }
 
-void Lampify::turn_off() {
-  ESP_LOGI(TAG, "Turning off lamp 0x%04X", device_id_);
+void Lampify::turn_off(uint8_t lamp_index) {
+  uint16_t device_id = get_device_id(lamp_index);
+  if (device_id == 0) {
+    ESP_LOGW(TAG, "Lamp %d: Device ID not set, cannot turn off", lamp_index + 1);
+    return;
+  }
+  ESP_LOGI(TAG, "Lamp %d: Turning off (ID 0x%04X)", lamp_index + 1, device_id);
   uint8_t packet[32];
-  build_packet(0x11, 0x00, 0x00, packet);
+  build_packet(device_id, 0x11, 0x00, 0x00, packet);
   send_packet(packet);
 }
 
-void Lampify::set_level(uint8_t cold, uint8_t warm) {
+void Lampify::set_level(uint8_t lamp_index, uint8_t cold, uint8_t warm) {
+  uint16_t device_id = get_device_id(lamp_index);
+  if (device_id == 0) {
+    ESP_LOGW(TAG, "Lamp %d: Device ID not set, cannot set level", lamp_index + 1);
+    return;
+  }
   cold = clamp_level(cold);
   warm = clamp_level(warm);
-  ESP_LOGI(TAG, "Setting lamp 0x%04X to cold=%d warm=%d", device_id_, cold, warm);
+  ESP_LOGI(TAG, "Lamp %d: Setting level cold=%d warm=%d (ID 0x%04X)", lamp_index + 1, cold, warm, device_id);
   uint8_t packet[32];
-  build_packet(0x21, cold, warm, packet);
+  build_packet(device_id, 0x21, cold, warm, packet);
   send_packet(packet);
 }
 
-void Lampify::pair() {
-  ESP_LOGI(TAG, "Pairing with lamp using ID 0x%04X", device_id_);
+void Lampify::pair(uint8_t lamp_index) {
+  uint16_t device_id = get_device_id(lamp_index);
+  if (device_id == 0) {
+    ESP_LOGW(TAG, "Lamp %d: Device ID not set, cannot pair", lamp_index + 1);
+    return;
+  }
+  ESP_LOGI(TAG, "Lamp %d: Pairing with ID 0x%04X", lamp_index + 1, device_id);
   uint8_t packet[32];
-  uint8_t id_high = (device_id_ >> 8) & 0xFF;
-  uint8_t id_low = device_id_ & 0xFF;
-  build_packet(0x28, id_high, id_low, packet);
+  uint8_t id_high = (device_id >> 8) & 0xFF;
+  uint8_t id_low = device_id & 0xFF;
+  build_packet(device_id, 0x28, id_high, id_low, packet);
   send_packet(packet);
 }
 

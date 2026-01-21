@@ -10,6 +10,8 @@ AUTO_LOAD = ["number", "button", "text_sensor"]
 
 CONF_DEVICE_ID = "device_id"
 CONF_LAMPIFY_ID = "lampify_id"
+CONF_LAMPS = "lamps"
+CONF_LAMP_INDEX = "lamp_index"
 
 lampify_ns = cg.esphome_ns.namespace("lampify")
 Lampify = lampify_ns.class_("Lampify", cg.Component)
@@ -23,7 +25,8 @@ PairAction = lampify_ns.class_("PairAction", automation.Action)
 CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(): cv.declare_id(Lampify),
-        cv.Optional(CONF_DEVICE_ID): cv.hex_uint16_t,
+        cv.Optional(CONF_LAMPS, default=8): cv.int_range(min=1, max=16),
+        cv.Optional(CONF_DEVICE_ID): cv.hex_uint16_t,  # Legacy: sets lamp 0
     }
 ).extend(cv.COMPONENT_SCHEMA)
 
@@ -32,20 +35,24 @@ async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
 
+    cg.add(var.set_num_lamps(config[CONF_LAMPS]))
+
     if CONF_DEVICE_ID in config:
-        cg.add(var.set_device_id(config[CONF_DEVICE_ID]))
+        cg.add(var.set_device_id(0, config[CONF_DEVICE_ID]))
 
 
 # Action schemas
 LAMPIFY_ACTION_SCHEMA = cv.Schema(
     {
         cv.GenerateID(): cv.use_id(Lampify),
+        cv.Optional(CONF_LAMP_INDEX, default=0): cv.templatable(cv.uint8_t),
     }
 )
 
 LAMPIFY_SET_LEVEL_SCHEMA = cv.Schema(
     {
         cv.GenerateID(): cv.use_id(Lampify),
+        cv.Optional(CONF_LAMP_INDEX, default=0): cv.templatable(cv.uint8_t),
         cv.Required("cold"): cv.templatable(cv.uint8_t),
         cv.Required("warm"): cv.templatable(cv.uint8_t),
     }
@@ -56,6 +63,8 @@ LAMPIFY_SET_LEVEL_SCHEMA = cv.Schema(
 async def turn_on_action_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg)
     await cg.register_parented(var, config[CONF_ID])
+    template_ = await cg.templatable(config[CONF_LAMP_INDEX], args, cg.uint8)
+    cg.add(var.set_lamp_index(template_))
     return var
 
 
@@ -63,6 +72,8 @@ async def turn_on_action_to_code(config, action_id, template_arg, args):
 async def turn_off_action_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg)
     await cg.register_parented(var, config[CONF_ID])
+    template_ = await cg.templatable(config[CONF_LAMP_INDEX], args, cg.uint8)
+    cg.add(var.set_lamp_index(template_))
     return var
 
 
@@ -70,6 +81,8 @@ async def turn_off_action_to_code(config, action_id, template_arg, args):
 async def set_level_action_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg)
     await cg.register_parented(var, config[CONF_ID])
+    template_ = await cg.templatable(config[CONF_LAMP_INDEX], args, cg.uint8)
+    cg.add(var.set_lamp_index(template_))
     template_ = await cg.templatable(config["cold"], args, cg.uint8)
     cg.add(var.set_cold(template_))
     template_ = await cg.templatable(config["warm"], args, cg.uint8)
@@ -81,4 +94,6 @@ async def set_level_action_to_code(config, action_id, template_arg, args):
 async def pair_action_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg)
     await cg.register_parented(var, config[CONF_ID])
+    template_ = await cg.templatable(config[CONF_LAMP_INDEX], args, cg.uint8)
+    cg.add(var.set_lamp_index(template_))
     return var

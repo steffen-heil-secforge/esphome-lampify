@@ -9,6 +9,7 @@ namespace lampify {
 class LampifyLight : public light::LightOutput, public Component {
  public:
   void set_parent(Lampify *parent) { this->parent_ = parent; }
+  void set_lamp_index(uint8_t index) { this->lamp_index_ = index; }
 
   void setup() override;
   void dump_config() override;
@@ -19,6 +20,7 @@ class LampifyLight : public light::LightOutput, public Component {
 
  protected:
   Lampify *parent_{nullptr};
+  uint8_t lamp_index_{0};
   bool last_state_{false};
   uint8_t last_cold_{0};
   uint8_t last_warm_{0};

@@ -16,7 +16,9 @@ external_components:
 
 ## Usage
 
-### Recommended Setup
+### Multi-Lamp Setup (Recommended)
+
+Control up to 16 lamps from a single ESP32. Device IDs are configured in Home Assistant and persisted to flash.
 
 ```yaml
 esp32_ble:
@@ -28,6 +30,48 @@ esp32_ble_tracker:
     active: false
     continuous: false
 
+lampify:
+  lamps: 8  # Number of lamp slots (1-16, default: 8)
+
+# Create entities for each lamp slot
+number:
+  - platform: lampify
+    name: "Lamp 1 Device ID"
+    lamp_index: 0
+  - platform: lampify
+    name: "Lamp 2 Device ID"
+    lamp_index: 1
+  # ... add more as needed
+
+button:
+  - platform: lampify
+    name: "Pair Lamp 1"
+    lamp_index: 0
+  - platform: lampify
+    name: "Pair Lamp 2"
+    lamp_index: 1
+  # ... add more as needed
+
+light:
+  - platform: lampify
+    name: "Lamp 1"
+    lamp_index: 0
+  - platform: lampify
+    name: "Lamp 2"
+    lamp_index: 1
+  # ... add more as needed
+
+# Optional: diagnostic sensor showing last sent packet
+text_sensor:
+  - platform: lampify
+    name: "Last Packet"
+```
+
+### Single Lamp Setup (Simple)
+
+For controlling just one lamp, you can omit `lamp_index` (defaults to 0):
+
+```yaml
 lampify:
 
 number:
@@ -41,11 +85,6 @@ button:
 light:
   - platform: lampify
     name: "Desk Lamp"
-
-# Optional: diagnostic sensor showing last sent packet
-text_sensor:
-  - platform: lampify
-    name: "Last Packet"
 ```
 
 ### IMPORTANT: BLE Scanner Interference
@@ -73,76 +112,76 @@ button:
       - esp32_ble_tracker.stop_scan:
 ```
 
-This creates:
-- A **number entity** to set the device ID from Home Assistant (persisted to flash)
-- A **pair button** to pair with lamps
-- A **light entity** with brightness and color temperature control
-
 ### With Preset Device ID
 
-If you know your device ID, you can set it in YAML:
+If you know your device ID, you can set it in YAML (sets lamp 0):
 
 ```yaml
-esp32_ble:
-
 lampify:
-  device_id: 0x1234  # Optional: preset device ID
-
-number:
-  - platform: lampify
-    name: "Lamp Device ID"
-
-button:
-  - platform: lampify
-    name: "Pair Lamp"
-
-light:
-  - platform: lampify
-    name: "Desk Lamp"
+  device_id: 0x1234  # Optional: preset device ID for lamp 0
 ```
 
 ### With Manual Actions (for automations)
 
 ```yaml
-esp32_ble:
-
 lampify:
-  id: my_lamp
+  id: my_lampify
 
 # Automation example
 button:
   - platform: template
-    name: "Bright Mode"
+    name: "Bright Mode Lamp 2"
     on_press:
       - lampify.set_level:
-          id: my_lamp
+          id: my_lampify
+          lamp_index: 1
           cold: 255
           warm: 255
 ```
 
 ## Pairing a New Lamp
 
-1. Set the device ID (any value 0x0001-0xFFFF) via the number entity in Home Assistant
-2. Power on the lamp
-3. Within 5 seconds, press the "Pair Lamp" button in Home Assistant
+1. Set the device ID (any value 1-65535) via the number entity in Home Assistant
+2. Power on the physical lamp
+3. Within 5 seconds, press the corresponding "Pair Lamp" button in Home Assistant
 4. The lamp will store the device ID and respond to future commands
+
+**Note:** Device IDs are freely chosen numbers (not sequential). Use the same IDs as with the CLI tool.
+
+## Configuration
+
+### Lampify Component
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `lamps` | int | 8 | Number of lamp slots (1-16) |
+| `device_id` | hex | - | Optional preset device ID for lamp 0 |
+
+### Entity Options
+
+All entities support the `lamp_index` option:
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `lamp_index` | int | 0 | Which lamp slot (0-15) this entity controls |
 
 ## Entities
 
-| Entity Type | Name | Description |
-|-------------|------|-------------|
-| `number` | Device ID | 0-65535, stored in flash |
-| `button` | Pair | Sends pair command to lamp |
-| `light` | Lamp | Brightness + color temperature control |
+| Entity Type | Platform | Description |
+|-------------|----------|-------------|
+| `number` | lampify | Device ID input (0-65535), stored in flash |
+| `button` | lampify | Pair button - sends pairing command |
+| `light` | lampify | Light control with brightness and color temperature |
+| `text_sensor` | lampify | Diagnostic - shows last sent packet (hex) |
 
 ## Actions (for automations)
 
 | Action | Parameters | Description |
 |--------|------------|-------------|
-| `lampify.turn_on` | none | Turn lamp on |
-| `lampify.turn_off` | none | Turn lamp off |
-| `lampify.set_level` | `cold`, `warm` (3-255) | Set brightness levels directly |
-| `lampify.pair` | none | Pair with lamp |
+| `lampify.turn_on` | `lamp_index` (default: 0) | Turn lamp on |
+| `lampify.turn_off` | `lamp_index` (default: 0) | Turn lamp off |
+| `lampify.set_level` | `lamp_index`, `cold`, `warm` (3-255) | Set brightness levels directly |
+| `lampify.pair` | `lamp_index` (default: 0) | Pair with lamp |
 
 ## Hardware
 
@@ -166,18 +205,24 @@ Requires ESP32 with BLE support. Tested on ESP32-C3 Super Mini.
 - Color temperature: 153-370 mireds (6500K-2700K)
 - Minimum brightness level: 3 (for cold and warm individually)
 
+### Data Persistence
+- Device IDs are stored in ESP32 NVS (Non-Volatile Storage)
+- Survives OTA updates and reboots
+- Only lost on full flash erase
+
 ## Troubleshooting
 
 ### Lamp not responding
-1. Verify device ID is set (check number entity)
+1. Verify device ID is set (check number entity shows non-zero value)
 2. Ensure no BLE scan is running
 3. Try multiple button presses
 4. Check lamp is powered and in range
+5. Verify lamp was paired with this device ID
 
 ### Intermittent failures (works sometimes)
 1. **Remove `ble_scanner` text_sensor** - most common cause
 2. Set `esp32_ble_tracker` to `continuous: false` and `active: false`
 3. Avoid triggering BLE scans while controlling lamp
 
-### Device ID resets after OTA
-The device ID is stored in flash but may reset after firmware updates. Re-enter it via the number entity.
+### Device ID shows 0 in HA but lamp works
+This was a bug in older versions where the number entity read the value before it was loaded from flash. Update to the latest version.

@@ -2,7 +2,7 @@ import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.components import light
 from esphome.const import CONF_OUTPUT_ID
-from . import lampify_ns, Lampify
+from . import lampify_ns, Lampify, CONF_LAMP_INDEX
 
 DEPENDENCIES = ["lampify"]
 
@@ -12,6 +12,7 @@ CONFIG_SCHEMA = light.LIGHT_SCHEMA.extend(
     {
         cv.GenerateID(CONF_OUTPUT_ID): cv.declare_id(LampifyLight),
         cv.GenerateID("lampify_id"): cv.use_id(Lampify),
+        cv.Optional(CONF_LAMP_INDEX, default=0): cv.int_range(min=0, max=15),
     }
 ).extend(cv.COMPONENT_SCHEMA)
 
@@ -23,3 +24,4 @@ async def to_code(config):
 
     parent = await cg.get_variable(config["lampify_id"])
     cg.add(var.set_parent(parent))
+    cg.add(var.set_lamp_index(config[CONF_LAMP_INDEX]))

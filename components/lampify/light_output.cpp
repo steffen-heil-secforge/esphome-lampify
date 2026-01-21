@@ -12,7 +12,7 @@ void LampifyLight::setup() {
 
 void LampifyLight::dump_config() {
   ESP_LOGCONFIG(TAG, "Lampify Light:");
-  ESP_LOGCONFIG(TAG, "  Using parent Lampify component");
+  ESP_LOGCONFIG(TAG, "  Lamp index: %d", this->lamp_index_);
 }
 
 light::LightTraits LampifyLight::get_traits() {
@@ -37,7 +37,7 @@ void LampifyLight::write_state(light::LightState *state) {
   if (is_on && brightness > 0.0f) {
     // If lamp was off, send turn_on command first
     if (!last_state_) {
-      this->parent_->turn_on();
+      this->parent_->turn_on(this->lamp_index_);
       last_state_ = true;
     }
 
@@ -72,13 +72,13 @@ void LampifyLight::write_state(light::LightState *state) {
 
     // Only send set_level if brightness/color changed
     if (cold != last_cold_ || warm != last_warm_) {
-      this->parent_->set_level(cold, warm);
+      this->parent_->set_level(this->lamp_index_, cold, warm);
       last_cold_ = cold;
       last_warm_ = warm;
     }
   } else {
     if (last_state_) {
-      this->parent_->turn_off();
+      this->parent_->turn_off(this->lamp_index_);
       last_state_ = false;
     }
   }
